@@ -1,10 +1,215 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Cron REST</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+  <title>Cron REST</title>
+  <style type="text/css">
+    .action-card {
+      border: 1px solid #CCC;
+      margin-top: 20px;
+    }
+    .form-control {
+      padding: 0.75rem .75rem;
+    }
+    .control-group {
+      margin: 20px;
+    }
+    .btn,
+    .alert {
+      margin-top: 10px;
+    }
+  </style>
 </head>
+
 <body>
-<h1>Cron REST</h1>
+
+  <div class="container col-4" style="margin-top: 20px">
+    <div>
+      <div>
+        <h1><strong>Cron REST</strong></h1>
+      </div>
+      <div style="margin-left: 20px;">
+        by <a href="https://github.com/eug">Eugênio Cabral</a>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="control-group">
+        <h3>Create</h3>
+        <div class="input-group">
+          <input id="create-pattern" type="text" class="form-control" placeholder="Pattern" aria-describedby="basic-addon1">
+          <input id="create-command" type="text" class="form-control" placeholder="Command" aria-describedby="basic-addon1">
+        </div>
+        <div id="create-message" class="alert" role="alert" style="display: none"></div>
+        <div>
+          <button id="create" type="button" class="btn btn-primary btn-lg btn-block">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="control-group">
+        <h3>Retrieve</h3>
+        <div class="input-group">
+          <input id="retrieve-jobid" type="text" class="form-control" placeholder="Job ID" aria-describedby="basic-addon1">
+        </div>
+        <ul id="retrieve-result" class="list-group" style="display: none; margin-top: 10px"></ul>
+        <div id="retrieve-message" class="alert" role="alert" style="display: none"></div>
+        <button id="retrieve" type="button" class="btn btn-primary btn-lg btn-block">Retrieve</button>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="control-group">
+        <h3>Update</h3>
+        <div class="input-group">
+          <input id="update-jobid" type="text" class="form-control" placeholder="Job ID" aria-describedby="basic-addon1">
+          <input id="update-pattern" type="text" class="form-control" placeholder="Pattern" aria-describedby="basic-addon1">
+          <input id="update-command" type="text" class="form-control" placeholder="Command" aria-describedby="basic-addon1">
+        </div>
+        <div id="update-message" class="alert" role="alert" style="display: none"></div>
+        <button id="update" type="button" class="btn btn-primary btn-lg btn-block">Update</button>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="control-group">
+        <h3>Delete</h3>
+        <div class="input-group">
+          <input id="delete-jobid" type="text" class="form-control" placeholder="Job ID" aria-describedby="basic-addon1">
+        </div>
+        <div id="delete-message" class="alert" role="alert" style="display: none"></div>
+        <button id="delete" type="button" class="btn btn-primary btn-lg btn-block">Delete</button>
+      </div>
+    </div>
+
+  </div>
+  <script type="text/javascript">
+    function messageSuccess(response, actionName) {
+      var json = $.parseJSON(response);
+      if (json['status'] === 'ok') {
+        $('#' + actionName + '-message').addClass('alert-success');
+      } else {
+        $('#' + actionName + '-message').addClass('alert-danger');
+      }
+      $('#' + actionName + '-message').html(json['message']);
+      $('#' + actionName + '-message').slideDown();
+    }
+
+    function messageError(response, actionName) {
+      $('#' + actionName + '-message').addClass('alert-danger');
+      $('#' + actionName + '-message').html('Unable to process request');
+      $('#' + actionName + '-message').slideDown();
+    }
+
+    $(document).click(function() {
+      $('.alert').slideUp();
+      $('.alert').removeClass('alert-success');
+      $('.alert').removeClass('alert-danger');
+    })
+    
+    $(document).keyup(function(e) {
+      if (e.keyCode == 13) {
+        var fields = e.target.id.split('-');
+        if (fields.length == 2) {
+          $('#' + fields[0]).click();
+        }
+      }
+    });
+
+    $('#create').click(function() {
+      $.ajax({
+        type: 'POST',
+        url: '/create',
+        data: {
+          pattern: $('#create-pattern').val(),
+          command: $('#create-command').val()
+        },
+        success: function(response) {
+          messageSuccess(response, 'create');
+        },
+        error: function(response) {
+          messageError(response, 'create');
+        }
+      });
+    });
+
+    $('#retrieve').click(function() {
+      var jobId = $('#retrieve-jobid').val();
+      var url = '/retrieve';
+      if (jobId && !/\D/.test(jobId)) {
+        url += '/id/' + jobId;
+      }
+      $.ajax({
+        type: 'GET',
+        url: url,
+        success: function(response) {
+          var jobs = $.parseJSON(response)['jobs'];
+          $('#retrieve-result').html('');
+          jobs.forEach(function(job) {
+            $('#retrieve-result').append(
+              '<li class="list-group-item">' +
+              '<div class="col-1" style="font-size: 20px">' + job.id + '</div>' +
+              '<div class="col">' + job.pattern + '<br>' + job.command +
+              '<br><span style="font-size: 12px">' + job.description + '</span></div>' +
+              '</li>');
+          });
+          $('#retrieve-result').slideDown();
+          messageSuccess(response, 'retrieve');
+        },
+        error: function(response) {
+          messageError(response, 'retrieve');
+        }
+      });
+    });
+
+    $('#update').click(function() {
+      var jobId = $('#update-jobid').val();
+      var url = '/update';
+      if (jobId && !/\D/.test(jobId)) {
+        url += '/id/' + jobId;
+      }
+      $.ajax({
+        type: 'POST',
+        url: url,
+        data: {
+          job_id: $('#update-jobid').val(),
+          pattern: $('#update-pattern').val(),
+          command: $('#update-command').val()
+        },
+        success: function(response) {
+          messageSuccess(response, 'update');
+        },
+        error: function(response) {
+          messageError(response, 'update');
+        }
+      });
+    });
+
+    $('#delete').click(function() {
+      var jobId = $('#delete-jobid').val();
+      var url = '/delete';
+      if (jobId && !/\D/.test(jobId)) {
+        url += '/id/' + jobId;
+      }
+      $.ajax({
+        type: 'DELETE',
+        url: url,
+        success: function(response) {
+          messageSuccess(response, 'delete');
+        },
+        error: function(response) {
+          messageError(response, 'delete');
+        }
+      });
+    });
+  </script>
 </body>
+
 </html>
