@@ -1,23 +1,22 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, request
-from crontab import CronTab
-from pretty_cron import prettify_cron
 import json
 import os
+from crontab import CronTab
+from flask import Flask, request
 from pathlib import Path
+from pretty_cron import prettify_cron
 
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
-    contents = Path(app.root_path + '/index.html').read_text()
-    return contents
+    return Path(app.root_path + '/index.html').read_text()
 
-@app.route('/create')
+@app.route('/create', methods=['POST'])
 def create():
-    pattern = request.args.get('pattern')
-    command = request.args.get('command')
+    pattern = request.form['pattern']
+    command = request.form['command']
     
     if not command or prettify_cron(pattern) == pattern:
         return json.dumps({
@@ -33,7 +32,8 @@ def create():
     cron.write()
 
     return json.dumps({
-        'status':'ok',
+        'status': 'ok',
+        'message': 'Job successfully created.',
         'job': {
             'id': job_id,
             'pattern': pattern,
@@ -42,8 +42,8 @@ def create():
         }
     })
 
-@app.route('/retrieve', defaults={'job_id': -1})
-@app.route('/retrieve/id/<int:job_id>')
+@app.route('/retrieve', methods=['GET'], defaults={'job_id': -1})
+@app.route('/retrieve/id/<int:job_id>', methods=['GET'])
 def retrieve(job_id):
 
     jobs = []
@@ -52,41 +52,48 @@ def retrieve(job_id):
     if job_id < 0:
         for i, job in enumerate(cron):
             pattern = job.slices.render()
+            command = job.command
+            description = prettify_cron(pattern)
             jobs.append({
                 'id': i,
                 'pattern': pattern,
-                'command': job.command,
-                'description': prettify_cron(pattern)
+                'command': command,
+                'description': description
             })
+        return json.dumps({
+            'status': 'ok',
+            'message': 'Jobs retrieved successfully',
+            'jobs' : jobs
+        })
     elif job_id < len(cron):
         job = cron[job_id]
         pattern = job.slices.render()
+        command = job.command
+        description = prettify_cron(pattern)
         return json.dumps({
             'status': 'ok',
-            'job' : {
+            'message': 'Job retrieved successfully',
+            'jobs' : [{
                 'id': job_id,
                 'pattern': pattern,
-                'command': job.command,
-                'description': prettify_cron(pattern)
-            }
-        })
-    else:
-        return json.dumps({
-            'status': 'fail',
-            'message': 'Job ID is invalid.'
+                'command': command,
+                'description': description
+
+            }]
         })
 
     return json.dumps({
-        'status': 'ok',
-        'jobs' : jobs
+        'status': 'fail',
+        'message': 'Job ID is invalid.'
     })
 
-@app.route('/update/id/<int:job_id>')
+@app.route('/update/id/<int:job_id>', methods=['POST'])
 def update(job_id):
-    pattern = request.args.get('pattern')
-    command = request.args.get('command')
+    pattern = request.form['pattern'] if 'pattern' in request.form else None
+    command = request.form['command'] if 'command' in request.form else None
+    description = ''
 
-    if not command or prettify_cron(pattern) == pattern:
+    if not command and prettify_cron(pattern) == pattern:
         return json.dumps({
             'status': 'fail',
             'message': 'Some argument must be provided.'
@@ -102,24 +109,29 @@ def update(job_id):
     if command:
         cron[job_id].set_command(command)
         
-    if prettify_cron(pattern) != pattern:
+    if pattern and prettify_cron(pattern) != pattern:
         cron[job_id].setall(pattern)
-
+        description = prettify_cron(pattern)
+    else:
+        pattern = cron[job_id].slices.render()
+    
     cron.write()
 
     return json.dumps({
         'status': 'ok',
+        'message': 'Job updated successfully.',
         'job': {
             'id': job_id,
             'pattern': pattern,
             'command': command,
-            'description': prettify_cron(pattern)
+            'description': description
         }
     })
 
-@app.route('/delete/id/<int:job_id>')
+@app.route('/delete/id/<int:job_id>', methods=['DELETE'])
 def delete(job_id):
     cron = CronTab(user=os.getenv('USER'))
+
     if job_id >= len(cron) or job_id < 0:
         return json.dumps({
             'status': 'fail',
@@ -129,7 +141,10 @@ def delete(job_id):
     cron.remove(cron[job_id])
     cron.write()
 
-    return json.dumps({'status': 'ok'})
+    return json.dumps({
+        'status': 'ok',
+        'message': 'Job deleted successfully.'
+    })
 
 if __name__ == '__main__':
     app.run()
