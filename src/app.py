@@ -17,7 +17,7 @@ def home():
 def create():
     pattern = request.form['pattern']
     command = request.form['command']
-    
+
     if not command or prettify_cron(pattern) == pattern:
         return json.dumps({
             'status': 'fail',
@@ -106,15 +106,16 @@ def update(job_id):
             'message': 'Job ID is invalid.'
         })
 
-    if command:
-        cron[job_id].set_command(command)
-        
+    if not command:
+        command = cron[job_id].command
+    cron[job_id].set_command(command)
+
     if pattern and prettify_cron(pattern) != pattern:
         cron[job_id].setall(pattern)
         description = prettify_cron(pattern)
     else:
         pattern = cron[job_id].slices.render()
-    
+
     cron.write()
 
     return json.dumps({
